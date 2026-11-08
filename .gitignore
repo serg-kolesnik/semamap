@@ -1,0 +1,18 @@
+# ВАЖНО: в data лежат миниатюры и пути ваших личных фото — в git не отправлять!
+data/*
+!data/.gitkeep
+semamap_data/
+hf_cache/
+
+# окружение и секреты
+.env
+venv/
+.venv/
+
+# python / редакторы
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

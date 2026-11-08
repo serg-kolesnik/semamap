@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: В репозитории нет личных данных
+        run: |
+          bad=$(git ls-files | grep -E '^(data|hf_cache|semamap_data)/' | grep -v '^data/\.gitkeep$' || true)
+          bad="$bad$(git ls-files | grep -E '(\.sqlite|\.npz|\.npy|\.env)$' | grep -v '^\.env\.example$' || true)"
+          if [ -n "$bad" ]; then echo "Нельзя коммитить данные и секреты:"; echo "$bad"; exit 1; fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python — синтаксис и неопределённые имена
+        run: |
+          python -m compileall -q main.py core web
+          pip install ruff
+          ruff check --select E9,F63,F7,F82 .
+
+      - name: CLI собирается без зависимостей
+        run: |
+          python main.py --help
+          python main.py serve --help
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: JavaScript — синтаксис
+        run: |
+          node --check web/static/app.js
+          python - <<'PY'
+          import re, pathlib
+          html = pathlib.Path("web/static/3d.html").read_text(encoding="utf-8")
+          code = re.search(r'<script type="module">(.*?)</script>', html, re.S).group(1)
+          code = re.sub(r"^import .*$", "", code, flags=re.M)
+          pathlib.Path("/tmp/3d.mjs").write_text(code, encoding="utf-8")
+          PY
+          node --check /tmp/3d.mjs

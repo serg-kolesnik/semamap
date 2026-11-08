@@ -1,0 +1,21 @@
+# Настройки берутся из файла .env (см. .env.example).
+services:
+  semamap:
+    build: .
+    image: semamap:latest
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./data:/app/data                           # база, карта и 3D-атлас
+      - ./hf_cache:/root/.cache/huggingface        # кэш моделей, чтобы не качать заново
+      - ${PHOTOS_DIR:?Укажите PHOTOS_DIR в файле .env}:/photos:ro   # ваша папка с фото (только чтение)
+      # для разработки без пересборки образа можно добавить:  - ./:/app
+    ports:
+      - "${SEMAMAP_BIND:-127.0.0.1}:${SEMAMAP_PORT:-8765}:8765"
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      SEMAMAP_USER: ${SEMAMAP_USER:-}
+      SEMAMAP_PASS: ${SEMAMAP_PASS:-}
+      SEMAMAP_PATH_MAP: ${SEMAMAP_PATH_MAP:-}
+    # Индексация и сборка карты (один раз и после добавления фото):
+    #   docker compose run --rm semamap sh -c "python main.py index /photos && python main.py build"

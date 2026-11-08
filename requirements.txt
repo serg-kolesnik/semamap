@@ -1,0 +1,11 @@
+numpy
+Pillow
+pillow-heif
+tqdm
+torch
+open_clip_torch
+umap-learn
+scikit-learn
+transformers
+sentencepiece
+sacremoses

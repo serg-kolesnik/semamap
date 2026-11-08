@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="ru" data-theme="light"><head><meta charset="utf-8"><title>Semamap 3D</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<style>
+:root{--bg:#ffffff;--fg:#222;--ac:#1f77b4;--panel:#f4f5f7;--line:#cfd2d8;--mut:#666;--box:#fffe}
+html[data-theme=dark]{color-scheme:dark;--bg:#0a0a0c;--fg:#e9e9ec;--ac:#00ff41;--panel:#15151a;--line:#33333d;--mut:#8d8e96;--box:#000d}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,"Segoe UI",Arial,sans-serif;overflow:hidden}
+#c{position:fixed;inset:0;display:block;touch-action:none;cursor:grab}
+#bar{position:fixed;top:12px;left:12px;right:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;z-index:10;pointer-events:none}
+#bar>*{pointer-events:auto}
+a,button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 11px;text-decoration:none;cursor:pointer;transition:.15s;font-size:13px}
+a:hover,button:hover{border-color:var(--ac);color:var(--ac)}
+button.on{border-color:var(--ac);color:var(--ac)}
+#panel{position:fixed;top:56px;left:12px;width:288px;max-height:calc(100% - 100px);overflow:auto;background:var(--box);border:1px solid var(--line);border-radius:8px;padding:6px 12px 10px;z-index:11;backdrop-filter:blur(6px)}
+#panel.hide{display:none}
+#panel h4{margin:12px 0 2px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);font-weight:600}
+.row{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;color:var(--mut)}
+.row>span:first-child{width:92px;flex:none}
+.row input[type=range]{flex:1;min-width:0;accent-color:var(--ac)}
+.row .v{width:44px;text-align:right;flex:none}
+.row.chk{gap:6px}.row.chk input{accent-color:var(--ac)}
+.btns{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+#help{font-size:11px;color:var(--mut);line-height:1.5;margin-top:8px}
+input[type=date]{flex:1;min-width:0;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:3px 6px;font:inherit;font-size:12px}
+.btns.years button{padding:2px 8px;font-size:12px}
+kbd{border:1px solid var(--line);border-radius:3px;padding:0 4px;font-size:10px;background:var(--panel)}
+#info{position:fixed;bottom:12px;left:12px;color:var(--mut);font-size:12px;z-index:10;pointer-events:none;background:var(--box);border:1px solid var(--line);border-radius:6px;padding:4px 9px}
+#tip{position:fixed;display:none;z-index:30;pointer-events:none;background:var(--panel);border:1px solid var(--ac);border-radius:6px;padding:4px;box-shadow:0 4px 18px #0004;text-align:center;font-size:12px;color:var(--fg)}
+#tip canvas{display:block;width:112px;height:112px;border-radius:3px;background:#000}
+#preview{position:fixed;bottom:20px;right:20px;width:300px;background:var(--panel);border:1px solid var(--ac);border-radius:8px;display:none;z-index:20;box-shadow:0 4px 24px #0005;overflow:hidden}
+#preview.on{display:block}
+#preview img{width:100%;height:auto;display:block;background:#000;min-height:120px}
+#preview .meta{padding:8px 10px;font-size:12px;color:var(--mut);border-top:1px solid var(--line)}
+#preview .meta .btns button,#preview .meta .btns a{padding:4px 8px;font-size:12px}
+#pclose{position:absolute;top:6px;right:6px;z-index:2;padding:0 8px;font-size:18px;line-height:24px;background:#000a;color:#fff;border-color:#fff3}
+#loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--ac);font-size:18px;text-align:center;padding:0 20px}
+@media (max-width:768px){#panel{width:calc(100% - 24px);max-height:55%}#preview{width:62vw;right:10px;bottom:46px}#info{display:none}}
+</style>
+</head><body>
+<canvas id="c"></canvas>
+<div id="bar">
+  <a href="/">← 2D карта</a>
+  <button id="bpanel" class="on">⚙ Настройки</button>
+  <button id="vfit" title="F">Вписать</button>
+  <button id="vfront" title="1">Фронт</button>
+  <button id="vtop" title="2">Сверху</button>
+  <button id="vside" title="3">Сбоку</button>
+  <button id="reset" title="R">Сброс</button>
+</div>
+
+<div id="panel">
+  <h4>Фото</h4>
+  <div class="row"><span>размер</span><input id="size" type="range" min="1" max="20" step="0.5"><span class="v" id="sizev"></span></div>
+  <div class="row chk"><input id="px" type="checkbox"><label for="px">авто-размер: фото не растут при приближении (удобнее разбирать скопления)</label></div>
+  <div class="row"><span>показывать, %</span><input id="subset" type="range" min="2" max="100" step="1"><span class="v" id="subsetv"></span></div>
+
+  <h4>Масштаб осей</h4>
+  <div class="row"><span>время (X)</span><input id="sx" type="range" min="0.2" max="4" step="0.1"><span class="v" id="sxv"></span></div>
+  <div class="row"><span>сходство (Y)</span><input id="sy" type="range" min="0.2" max="4" step="0.1"><span class="v" id="syv"></span></div>
+  <div class="row"><span>сходство (Z)</span><input id="sz" type="range" min="0.2" max="4" step="0.1"><span class="v" id="szv"></span></div>
+  <div class="btns"><button id="sc1">Все 1:1:1</button></div>
+
+  <h4>Время: период (ось X)</h4>
+  <div class="row"><span>с</span><input id="t0" type="range" min="0" max="1000" step="1"><span class="v" id="t0v" style="width:70px"></span></div>
+  <div class="row"><span>по</span><input id="t1" type="range" min="0" max="1000" step="1"><span class="v" id="t1v" style="width:70px"></span></div>
+  <div class="row"><span>с даты</span><input id="d0" type="date"></div>
+  <div class="row"><span>по дату</span><input id="d1" type="date"></div>
+  <div class="btns years" id="years"></div>
+  <h4>Сходство: границы по Y</h4>
+  <div class="row"><span>от</span><input id="y0" type="range" min="0" max="1000" step="1"><span class="v" id="y0v"></span></div>
+  <div class="row"><span>до</span><input id="y1" type="range" min="0" max="1000" step="1"><span class="v" id="y1v"></span></div>
+  <h4>Сходство: границы по Z</h4>
+  <div class="row"><span>от</span><input id="z0" type="range" min="0" max="1000" step="1"><span class="v" id="z0v"></span></div>
+  <div class="row"><span>до</span><input id="z1" type="range" min="0" max="1000" step="1"><span class="v" id="z1v"></span></div>
+  <div class="row chk"><input id="stretch" type="checkbox"><label for="stretch">растягивать выбранный диапазон на весь график по всем трём осям</label></div>
+
+  <h4>Выделение</h4>
+  <div class="row"><span>похожих, шт.</span><input id="simk" type="range" min="10" max="200" step="5"><span class="v" id="simkv"></span></div>
+  <div class="row"><span>окрестность, ±%</span><input id="nbr" type="range" min="2" max="40" step="1"><span class="v" id="nbrv"></span></div>
+  <div class="row"><span>и время, ±мес.</span><input id="nbt" type="range" min="0" max="60" step="1"><span class="v" id="nbtv"></span></div>
+  <div class="row chk"><input id="dim" type="checkbox"><label for="dim">затемнять остальные при показе похожих</label></div>
+
+  <h4>Оформление</h4>
+  <div class="btns"><button id="theme">Тёмная тема</button></div>
+
+  <div id="help">
+    <b>Мышь:</b> ЛКМ — вращать, колесо — зум, ПКМ — сдвиг.<br>
+    <b>Клик</b> по фото — превью и выделение, <b>двойной клик</b> — подлететь к фото.<br>
+    <b>Клавиши:</b> <kbd>F</kbd> вписать, <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> фронт/сверху/сбоку, <kbd>R</kbd> сброс, <kbd>H</kbd> панель, <kbd>Esc</kbd> снять выделение, стрелки — сдвиг.<br>
+    В превью: «Похожие» подсвечивает самые близкие по смыслу, «◀ ▶» — соседние по времени.
+  </div>
+</div>
+
+<div id="info"></div>
+<div id="tip"><canvas id="tipc" width="112" height="112"></canvas><div id="tipd"></div></div>
+<div id="preview">
+  <button id="pclose" title="Esc">×</button>
+  <img id="pimg" alt="">
+  <div class="meta">
+    <div id="pdate" style="margin-bottom:4px"></div>
+    <div class="btns"><a id="plink" href="#" target="_blank" rel="noopener">Открыть полностью</a><button id="psim">Похожие</button><button id="pfly">Подлететь</button></div>
+    <div class="btns"><button id="pnb" title="Оставить только фото рядом по сходству (Y/Z)">Окрестность (Y/Z)</button></div>
+    <div class="btns"><button id="pprev">◀ раньше</button><button id="pnext">позже ▶</button></div>
+  </div>
+</div>
+<div id="loading">Загрузка…</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = s => document.querySelector(s);
+const canvas = $('#c');
+const fail = m => { $('#loading').style.display = 'block'; $('#loading').textContent = m; };
+
+// ---------------- настройки (запоминаются в браузере) ----------------
+const LS = 'semamap3d';
+const cfg = { size: 5, sx: 1, sy: 1, sz: 1, theme: 'light', px: false, subset: 100, simk: 40, dim: true, panel: true, stretch: true, nbr: 8, nbt: 0 };
+try { Object.assign(cfg, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
+const save = () => { try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (e) {} };
+
+const THEMES = {
+  light: { bg: 0xffffff, grid: 0xd9dce1, text: '#555555', title: '#222222', bgv: [1, 1, 1], acc: [0.12, 0.47, 0.71] },
+  dark:  { bg: 0x0a0a0c, grid: 0x33333d, text: '#aaaab2', title: '#e9e9ec', bgv: [0.04, 0.04, 0.047], acc: [0, 1, 0.25] },
+};
+const SEL_COLOR = [1, 0.55, 0];
+let theme = THEMES[cfg.theme] ? cfg.theme : 'light';
+document.documentElement.dataset.theme = theme;
+const B = 100;                                   // половина размера куба данных
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(THEMES[theme].bg);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 8000);
+camera.position.set(190, 95, 250);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.dampingFactor = 0.08; controls.maxDistance = 4000;
+controls.zoomToCursor = true;                    // зум к курсору
+controls.listenToKeyEvents(window); controls.keyPanSpeed = 25;
+
+const SC = { x: cfg.sx, y: cfg.sy, z: cfg.sz };  // растяжение осей
+let SIZE = cfg.size, PX = cfg.px;
+let N = 0, KVIS = 0, IDS, DATE, POS, ORIG, FLAG, ID2K, ORDER, RANK, RANGE;
+let mat, flagAttr, geom, atlasImg, atlasGrid = 1, atlasCell = 64;
+let selLo = [-B, -B, -B], selHi = [B, B, B];     // выбранный диапазон по X, Y, Z (в единицах данных)
+let dLo = [-B, -B, -B], dHi = [B, B, B];         // полный диапазон данных (для Y/Z берётся из данных)
+let mLo = [-B, -B, -B], mHi = [B, B, B], lastMap = '';   // какой отрезок данных сейчас растянут на всю ось
+const mapV = (v, a) => (v - mLo[a]) / Math.max(mHi[a] - mLo[a], 1e-6) * 2 * B - B;
+let axesTimer = 0;
+
+// ---------------- оси, сетка, подписи ----------------
+const axes = new THREE.Group(); scene.add(axes);
+let wallZ, wallX, wallY, xLabels, tY, tZ, tX;
+
+function label(text, color, scale = 16) {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+  const g = cv.getContext('2d');
+  g.font = '600 30px system-ui, Arial, sans-serif';
+  g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 128, 32);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+  s.scale.set(scale, scale / 4, 1); s.renderOrder = 10;
+  return s;
+}
+
+function dateTicks(lo, hi) {
+  const years = (hi - lo) / 86400 / 365.25;
+  let unit, step;
+  if (years > 12) { unit = 'y'; step = Math.ceil(years / 8); }
+  else if (years > 3) { unit = 'y'; step = 1; }
+  else if (years > 1.2) { unit = 'm'; step = 3; }
+  else if (years > 0.4) { unit = 'm'; step = 1; }
+  else { unit = 'd'; step = Math.max(1, Math.ceil((hi - lo) / 86400 / 8)); }
+  const d0 = new Date(lo * 1000), out = [];
+  let d;
+  if (unit === 'y') d = new Date(d0.getFullYear() - d0.getFullYear() % step, 0, 1);
+  else if (unit === 'm') d = new Date(d0.getFullYear(), d0.getMonth() - d0.getMonth() % step, 1);
+  else d = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate());
+  for (let i = 0; i < 60 && d.getTime() / 1000 <= hi; i++) {
+    const t = d.getTime() / 1000;
+    if (t >= lo) {
+      const txt = unit === 'y' ? String(d.getFullYear())
+        : unit === 'm' ? d.toLocaleDateString('ru', { month: 'short', year: '2-digit' })
+        : d.toLocaleDateString('ru', { day: 'numeric', month: 'short' });
+      out.push({ x: ((t - lo) / (hi - lo) * 2 - 1) * B, txt });
+    }
+    if (unit === 'y') d = new Date(d.getFullYear() + step, 0, 1);
+    else if (unit === 'm') d = new Date(d.getFullYear(), d.getMonth() + step, 1);
+    else d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + step);
+  }
+  return out;
+}
+
+function lines(segs, color) {
+  const arr = [];
+  for (const s of segs) arr.push(...s);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+  return new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color }));
+}
+
+function buildAxes() {
+  if (!RANGE) return;
+  while (axes.children.length) axes.remove(axes.children[0]);
+  const T = THEMES[theme];
+  const span = RANGE[1] - RANGE[0];
+  const xt = dateTicks(RANGE[0] + (mLo[0] + B) / (2 * B) * span, RANGE[0] + (mHi[0] + B) / (2 * B) * span);
+  const gv = [-100, -60, -20, 20, 60, 100];
+  wallZ = lines([...xt.map(t => [t.x, -B, 0, t.x, B, 0]), ...gv.map(v => [-B, v, 0, B, v, 0])], T.grid);
+  wallX = lines([...gv.map(v => [0, v, -B, 0, v, B]), ...gv.map(v => [0, -B, v, 0, B, v])], T.grid);
+  wallY = lines([...xt.map(t => [t.x, 0, -B, t.x, 0, B]), ...gv.map(v => [-B, 0, v, B, 0, v])], T.grid);
+  axes.add(wallZ, wallX, wallY);
+  xLabels = new THREE.Group();
+  for (const t of xt) { const s = label(t.txt, T.text, 14); s.userData.x = t.x; s.position.set(t.x, 0, 0); xLabels.add(s); }
+  axes.add(xLabels);
+  tX = label('время', T.title, 22); tY = label('сходство (Y)', T.title, 26); tZ = label('сходство (Z)', T.title, 26);
+  axes.add(tX, tY, tZ);
+}
+
+function updateAxes() {
+  if (!wallZ) return;
+  const c = camera.position;
+  const bx = B * SC.x, by = B * SC.y, bz = B * SC.z;
+  const zb = c.z > 0 ? -bz : bz, xb = c.x > 0 ? -bx : bx, yb = c.y > 0 ? -by : by;
+  const zf = -zb, xf = -xb;
+  wallZ.scale.set(SC.x, SC.y, 1); wallZ.position.z = zb;
+  wallX.scale.set(1, SC.y, SC.z); wallX.position.x = xb;
+  wallY.scale.set(SC.x, 1, SC.z); wallY.position.y = yb;
+  for (const s of xLabels.children) s.position.x = s.userData.x * SC.x;
+  xLabels.position.set(0, yb + (yb < 0 ? -8 : 8), zf + (zf > 0 ? 9 : -9));
+  tX.position.set(0, yb + (yb < 0 ? -22 : 22), zf + (zf > 0 ? 18 : -18));
+  tY.position.set(xb + (xb < 0 ? -22 : 22), 0, zf + (zf > 0 ? 12 : -12));
+  tZ.position.set(xf + (xf > 0 ? 22 : -22), yb + (yb < 0 ? -8 : 8), 0);
+}
+
+// ---------------- данные и фото-билборды ----------------
+try {
+  const [data, meta, tex] = await Promise.all([
+    fetch('/api/points3d').then(r => r.json()),
+    fetch('/api/atlas_meta').then(r => r.json()),
+    new THREE.TextureLoader().loadAsync('/api/atlas.jpg'),
+  ]);
+  if (data.error || meta.error) throw new Error(data.error || meta.error);
+  if (tex.image.width > renderer.capabilities.maxTextureSize)
+    throw new Error('Атлас больше, чем поддерживает ваша видеокарта (' + renderer.capabilities.maxTextureSize + 'px)');
+  N = data.ids.length; RANGE = data.range;
+  atlasGrid = meta.grid; atlasCell = meta.cell; atlasImg = tex.image;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+
+  // случайный порядок: «показывать N %» берёт равномерную выборку, а не кусок облака
+  const perm = Array.from({ length: N }, (_, i) => i);
+  let seed = 12345;
+  const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  for (let i = N - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+
+  IDS = new Array(N); DATE = new Float64Array(N); POS = new Float32Array(N * 3);
+  ORIG = new Int32Array(N); FLAG = new Float32Array(N);
+  const uvs = new Float32Array(N * 2);
+  for (let k = 0; k < N; k++) {
+    const o = perm[k];
+    IDS[k] = data.ids[o]; DATE[k] = data.date[o]; ORIG[k] = o;
+    POS[k*3] = data.x[o]; POS[k*3+1] = data.y[o]; POS[k*3+2] = data.z[o];
+    uvs[k*2] = (o % atlasGrid) / atlasGrid;                    // ячейка атласа = исходный индекс точки
+    uvs[k*2+1] = 1 - (Math.floor(o / atlasGrid) + 1) / atlasGrid;
+  }
+  ID2K = new Map(IDS.map((id, k) => [id, k]));
+  for (const a of [1, 2]) {                                    // границы данных по Y и Z
+    let lo = Infinity, hi = -Infinity;
+    for (let k = 0; k < N; k++) { const v = POS[k*3 + a]; if (v < lo) lo = v; if (v > hi) hi = v; }
+    if (!(hi - lo > 1e-6)) { lo -= 1; hi += 1; }
+    dLo[a] = lo; dHi[a] = hi;
+  }
+  selLo = dLo.slice(); selHi = dHi.slice();
+  ORDER = Array.from({ length: N }, (_, k) => k).sort((a, b) => DATE[a] - DATE[b]);
+  RANK = new Int32Array(N); ORDER.forEach((k, r) => { RANK[k] = r; });
+
+  geom = new THREE.InstancedBufferGeometry();
+  const plane = new THREE.PlaneGeometry(1, 1);
+  geom.index = plane.index;
+  geom.setAttribute('position', plane.getAttribute('position'));
+  geom.setAttribute('uv', plane.getAttribute('uv'));
+  geom.setAttribute('iPosition', new THREE.InstancedBufferAttribute(POS, 3));
+  geom.setAttribute('iUV', new THREE.InstancedBufferAttribute(uvs, 2));
+  flagAttr = new THREE.InstancedBufferAttribute(FLAG, 1); flagAttr.setUsage(THREE.DynamicDrawUsage);
+  geom.setAttribute('iFlag', flagAttr);
+  geom.instanceCount = N;
+
+  const T0 = THEMES[theme];
+  mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uAtlas: { value: tex }, uUVScale: { value: 1 / atlasGrid },
+      uCamRight: { value: new THREE.Vector3(1, 0, 0) }, uCamUp: { value: new THREE.Vector3(0, 1, 0) },
+      uCamPos: { value: new THREE.Vector3() },
+      uSize: { value: SIZE }, uSizePx: { value: SIZE * 4 }, uPx: { value: PX ? 1 : 0 }, uFocal: { value: 800 },
+      uScale: { value: new THREE.Vector3(1, 1, 1) },
+      uLo: { value: new THREE.Vector3(-B, -B, -B) }, uHi: { value: new THREE.Vector3(B, B, B) },
+      uMapLo: { value: new THREE.Vector3(-B, -B, -B) }, uMapHi: { value: new THREE.Vector3(B, B, B) },
+      uDim: { value: 0 },
+      uBg: { value: new THREE.Vector3(...T0.bgv) }, uAcc: { value: new THREE.Vector3(...T0.acc) },
+      uSel: { value: new THREE.Vector3(...SEL_COLOR) },
+    },
+    vertexShader: `
+      attribute vec3 iPosition;
+      attribute vec2 iUV;
+      attribute float iFlag;
+      uniform vec3 uCamRight, uCamUp, uCamPos, uScale;
+      uniform float uUVScale, uSize, uSizePx, uPx, uFocal;
+      uniform vec3 uLo, uHi, uMapLo, uMapHi;
+      varying vec2 vUv, vLoc;
+      varying float vFlag;
+      void main() {
+        vec3 P = ((iPosition - uMapLo) / max(uMapHi - uMapLo, vec3(0.001)) * 200.0 - 100.0) * uScale;
+        vec4 mc = modelViewMatrix * vec4(P, 1.0);
+        float depth = max(-mc.z, 0.01);
+        float s = uPx > 0.5 ? uSizePx * depth / uFocal : uSize;
+        float bump = iFlag > 1.5 ? 1.5 : (iFlag > 0.5 ? 1.25 : 1.0);
+        vec3 inr = step(uLo, iPosition) * step(iPosition, uHi);              // фильтр по диапазонам X/Y/Z
+        float vis = inr.x * inr.y * inr.z;
+        s *= bump * vis;
+        vec3 lift = iFlag > 0.5 ? normalize(uCamPos - P) * 1.5 : vec3(0.0);
+        vec3 wp = P + lift + (uCamRight * position.x + uCamUp * position.y) * s;
+        vUv = iUV + (uv * 0.96 + 0.02) * uUVScale;
+        vLoc = uv; vFlag = iFlag;
+        gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+      }`,
+    fragmentShader: `
+      uniform sampler2D uAtlas;
+      uniform float uDim;
+      uniform vec3 uBg, uAcc, uSel;
+      varying vec2 vUv, vLoc;
+      varying float vFlag;
+      void main() {
+        vec3 col = texture2D(uAtlas, vUv).rgb;
+        if (uDim > 0.5 && vFlag < 0.5) col = mix(col, uBg, 0.8);
+        float e = min(min(vLoc.x, 1.0 - vLoc.x), min(vLoc.y, 1.0 - vLoc.y));
+        if (vFlag > 1.5 && e < 0.08) col = uSel;
+        else if (vFlag > 0.5 && e < 0.05) col = uAcc;
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  buildAxes();
+  $('#loading').style.display = 'none';
+} catch (e) { fail('Ошибка: ' + e.message); }
+
+// ---------------- применение настроек ----------------
+const fmtMonth = sec => new Date(sec * 1000).toLocaleDateString('ru', { month: 'short', year: 'numeric' });
+const focalPx = () => innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+
+function updateInfo() {
+  if (!N) return;
+  const t0 = RANGE[0] + (selLo[0] + B) / (2 * B) * (RANGE[1] - RANGE[0]);
+  const t1 = RANGE[0] + (selHi[0] + B) / (2 * B) * (RANGE[1] - RANGE[0]);
+  $('#info').textContent = `показано ${KVIS} из ${N} фото · период ${fmtMonth(t0)} — ${fmtMonth(t1)}`;
+}
+function applyAll() {
+  $('#size').value = SIZE; $('#sizev').textContent = SIZE;
+  $('#px').checked = PX;
+  $('#subset').value = cfg.subset; $('#subsetv').textContent = cfg.subset + '%';
+  for (const k of ['x', 'y', 'z']) { $('#s' + k).value = SC[k]; $('#s' + k + 'v').textContent = SC[k].toFixed(1); }
+  $('#simk').value = cfg.simk; $('#simkv').textContent = cfg.simk;
+  $('#dim').checked = cfg.dim;
+  $('#nbr').value = cfg.nbr; $('#nbrv').textContent = '±' + cfg.nbr + '%';
+  $('#nbt').value = cfg.nbt; $('#nbtv').textContent = cfg.nbt ? '±' + cfg.nbt : 'нет';
+  $('#stretch').checked = cfg.stretch;
+  $('#theme').textContent = theme === 'light' ? 'Тёмная тема' : 'Светлая тема';
+  $('#panel').classList.toggle('hide', !cfg.panel);
+  $('#bpanel').classList.toggle('on', cfg.panel);
+  if (!mat) return;
+  mat.uniforms.uSize.value = SIZE; mat.uniforms.uSizePx.value = SIZE * 4; mat.uniforms.uPx.value = PX ? 1 : 0;
+  mat.uniforms.uScale.value.set(SC.x, SC.y, SC.z);
+  mat.uniforms.uLo.value.set(...selLo); mat.uniforms.uHi.value.set(...selHi);
+  for (let a = 0; a < 3; a++) { mLo[a] = cfg.stretch ? selLo[a] : -B; mHi[a] = cfg.stretch ? selHi[a] : B; }
+  mat.uniforms.uMapLo.value.set(...mLo); mat.uniforms.uMapHi.value.set(...mHi);
+  const key = mLo[0] + '|' + mHi[0];
+  if (key !== lastMap) { lastMap = key; clearTimeout(axesTimer); axesTimer = setTimeout(buildAxes, 60); }
+  KVIS = Math.max(1, Math.round(N * cfg.subset / 100)); geom.instanceCount = KVIS;
+  mat.uniforms.uFocal.value = focalPx();
+  updateInfo();
+}
+function persist() { Object.assign(cfg, { size: SIZE, px: PX, sx: SC.x, sy: SC.y, sz: SC.z, theme }); save(); }
+
+$('#size').oninput = e => { SIZE = +e.target.value; applyAll(); persist(); };
+$('#px').onchange = e => { PX = e.target.checked; applyAll(); persist(); };
+$('#subset').oninput = e => { cfg.subset = +e.target.value; applyAll(); save(); };
+for (const k of ['x', 'y', 'z']) $('#s' + k).oninput = e => { SC[k] = +e.target.value; applyAll(); persist(); };
+$('#sc1').onclick = () => { SC.x = SC.y = SC.z = 1; applyAll(); persist(); };
+$('#simk').oninput = e => { cfg.simk = +e.target.value; $('#simkv').textContent = cfg.simk; save(); };
+$('#stretch').onchange = e => { cfg.stretch = e.target.checked; applyAll(); save(); };
+$('#dim').onchange = e => { cfg.dim = e.target.checked; if (simActive) mat.uniforms.uDim.value = cfg.dim ? 1 : 0; save(); };
+const SL = [['#t0', '#t1'], ['#y0', '#y1'], ['#z0', '#z1']];
+function syncRange(a = 0, which = 0) {
+  const [i0, i1] = SL[a];
+  let lo = +$(i0).value, hi = +$(i1).value;
+  if (lo > hi) { if (which === 0) { lo = hi; $(i0).value = lo; } else { hi = lo; $(i1).value = hi; } }
+  selLo[a] = dLo[a] + (dHi[a] - dLo[a]) * lo / 1000;
+  selHi[a] = dLo[a] + (dHi[a] - dLo[a]) * hi / 1000;
+  if (a === 0) {
+    const f = v => fmtMonth(RANGE[0] + v / 1000 * (RANGE[1] - RANGE[0]));
+    $('#t0v').textContent = f(lo); $('#t1v').textContent = f(hi);
+    const span = RANGE[1] - RANGE[0], iso = t => { const d = new Date(t * 1000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+    $('#d0').value = iso(RANGE[0] + (selLo[0] + B) / (2 * B) * span); $('#d1').value = iso(RANGE[0] + (selHi[0] + B) / (2 * B) * span);
+  } else {
+    const n = 'yz'[a - 1];
+    $('#' + n + '0v').textContent = Math.round(lo / 10) + '%'; $('#' + n + '1v').textContent = Math.round(hi / 10) + '%';
+  }
+  applyAll();
+}
+for (let a = 0; a < 3; a++) {
+  $(SL[a][0]).oninput = () => syncRange(a, 0); $(SL[a][1]).oninput = () => syncRange(a, 1);
+  $(SL[a][0]).value = 0; $(SL[a][1]).value = 1000;
+}
+// ---- точная установка диапазона: даты, годы, окрестность фото ----
+function setSel(a, lo, hi) {
+  lo = Math.max(lo, dLo[a]); hi = Math.min(hi, dHi[a]);
+  if (hi < lo) [lo, hi] = [hi, lo];
+  const f = v => Math.round((v - dLo[a]) / Math.max(dHi[a] - dLo[a], 1e-9) * 1000);
+  let a0 = f(lo), a1 = f(hi);
+  if (a1 - a0 < 4) { a0 = Math.max(0, a0 - 2); a1 = Math.min(1000, a1 + 2); }
+  $(SL[a][0]).value = a0; $(SL[a][1]).value = a1;
+  syncRange(a, 0);
+}
+const t2x = t => ((t - RANGE[0]) / (RANGE[1] - RANGE[0]) * 2 - 1) * B;   // секунды -> координата X
+function setPeriod(t0, t1) {
+  const x0 = t2x(t0), x1 = t2x(t1);
+  if (x1 < dLo[0] || x0 > dHi[0]) return;                  // период вне данных — игнорируем
+  setSel(0, x0, x1);
+}
+const dateVal = (v, end) => new Date(v + (end ? 'T23:59:59' : 'T00:00:00')).getTime() / 1000;
+$('#d0').onchange = e => { if (e.target.value && N) setPeriod(dateVal(e.target.value, false), dateVal($('#d1').value || e.target.value, true)); };
+$('#d1').onchange = e => { if (e.target.value && N) setPeriod(dateVal($('#d0').value || e.target.value, false), dateVal(e.target.value, true)); };
+function buildYears() {
+  const box = $('#years'); box.innerHTML = '';
+  const y0 = new Date(RANGE[0] * 1000).getFullYear(), y1 = new Date(RANGE[1] * 1000).getFullYear();
+  const all = document.createElement('button'); all.textContent = 'все';
+  all.onclick = () => setSel(0, dLo[0], dHi[0]); box.appendChild(all);
+  for (let y = Math.max(y0, y1 - 23); y <= y1; y++) {
+    const b = document.createElement('button'); b.textContent = y;
+    b.onclick = () => setPeriod(new Date(y, 0, 1).getTime() / 1000, new Date(y, 11, 31, 23, 59, 59).getTime() / 1000);
+    box.appendChild(b);
+  }
+}
+$('#nbr').oninput = e => { cfg.nbr = +e.target.value; applyAll(); save(); };
+$('#nbt').oninput = e => { cfg.nbt = +e.target.value; applyAll(); save(); };
+
+let nb = null;                                              // сохранённые диапазоны до «окрестности»
+function setNbButton() {
+  $('#pnb').textContent = nb ? 'Снять окрестность' : 'Окрестность (Y/Z)';
+  $('#pnb').classList.toggle('on', !!nb);
+}
+function toggleNbhd() {
+  if (nb) {                                                // вернуть прежние диапазоны
+    const old = nb; nb = null;
+    for (let a = 0; a < 3; a++) setSel(a, old.lo[a], old.hi[a]);
+    setNbButton(); return;
+  }
+  if (selK < 0) return;
+  const k = selK;
+  nb = { lo: selLo.slice(), hi: selHi.slice() };
+  for (const a of [1, 2]) { const r = cfg.nbr / 100 * (dHi[a] - dLo[a]); setSel(a, POS[k*3 + a] - r, POS[k*3 + a] + r); }
+  if (cfg.nbt > 0) {
+    const dx = cfg.nbt * 30.44 * 86400 / (RANGE[1] - RANGE[0]) * 2 * B;
+    setSel(0, POS[k*3] - dx, POS[k*3] + dx);
+  }
+  setNbButton();
+  flyToK(k, 60);
+}
+$('#pnb').onclick = toggleNbhd;
+
+$('#theme').onclick = () => {
+  theme = theme === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = theme;
+  scene.background.setHex(THEMES[theme].bg);
+  if (mat) { mat.uniforms.uBg.value.set(...THEMES[theme].bgv); mat.uniforms.uAcc.value.set(...THEMES[theme].acc); }
+  buildAxes(); applyAll(); persist();
+};
+$('#bpanel').onclick = () => { cfg.panel = !cfg.panel; applyAll(); save(); };
+
+// ---------------- камера: плавные переходы и виды ----------------
+let tween = null;
+function flyTo(pos, target, ms = 650) {
+  tween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos, t1: target, s: performance.now(), ms };
+}
+controls.addEventListener('start', () => { tween = null; });
+
+function view(name, animate = true) {
+  const bx = B * SC.x, by = B * SC.y, bz = B * SC.z;
+  const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), asp = innerWidth / innerHeight;
+  let pos;
+  if (name === 'front') pos = new THREE.Vector3(0, 0, Math.max(by / t, bx / (t * asp)) * 1.12 + bz);
+  else if (name === 'top') pos = new THREE.Vector3(0, Math.max(bz / t, bx / (t * asp)) * 1.12 + by, 0.5);
+  else if (name === 'side') pos = new THREE.Vector3(Math.max(by / t, bz / (t * asp)) * 1.12 + bx, 0, 0);
+  else {
+    const r = Math.hypot(bx, by, bz);
+    pos = new THREE.Vector3(0.55, 0.3, 0.78).normalize().multiplyScalar(r / t * 0.95);
+  }
+  const target = new THREE.Vector3(0, 0, 0);
+  if (animate) flyTo(pos, target); else { camera.position.copy(pos); controls.target.copy(target); }
+}
+$('#vfit').onclick = () => view('iso'); $('#vfront').onclick = () => view('front');
+$('#vtop').onclick = () => view('top'); $('#vside').onclick = () => view('side');
+function resetAll() {
+  SC.x = SC.y = SC.z = 1;
+  for (let a = 0; a < 3; a++) { $(SL[a][0]).value = 0; $(SL[a][1]).value = 1000; syncRange(a, 0); }
+  nb = null; setNbButton();
+  persist(); view('iso');
+}
+$('#reset').onclick = resetAll;
+
+// ---------------- выбор, подсветка, похожие ----------------
+let selK = -1, simActive = false, flagged = [];
+function clearFlags() {
+  for (const k of flagged) FLAG[k] = 0;
+  flagged = []; simActive = false;
+  if (mat) mat.uniforms.uDim.value = 0;
+  if (flagAttr) flagAttr.needsUpdate = true;
+  $('#psim').classList.remove('on');
+}
+function clearAll() { clearFlags(); selK = -1; $('#preview').classList.remove('on'); }
+
+function selectK(k, fly = false) {
+  clearFlags();
+  selK = k; FLAG[k] = 2; flagged = [k]; flagAttr.needsUpdate = true;
+  const id = IDS[k];
+  $('#pimg').src = '/api/thumb512?id=' + id;
+  $('#pdate').textContent = new Date(DATE[k] * 1000).toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' });
+  $('#plink').href = '/file/' + id;
+  $('#preview').classList.add('on');
+  if (fly) flyToK(k);
+}
+function flyToK(k, dist) {
+  const target = new THREE.Vector3(mapV(POS[k*3], 0) * SC.x, mapV(POS[k*3+1], 1) * SC.y, mapV(POS[k*3+2], 2) * SC.z);
+  const cur = camera.position.distanceTo(controls.target);
+  const d = dist || THREE.MathUtils.clamp(cur, 25, 120);
+  const dir = camera.position.clone().sub(target).normalize();
+  flyTo(target.clone().add(dir.multiplyScalar(d)), target);
+}
+async function toggleSimilar() {
+  if (selK < 0) return;
+  if (simActive) { const k = selK; clearFlags(); selK = k; FLAG[k] = 2; flagged = [k]; flagAttr.needsUpdate = true; return; }
+  try {
+    const items = await fetch(`/api/similar?id=${IDS[selK]}&k=${cfg.simk + 1}`).then(r => r.json());
+    if (!Array.isArray(items)) return;
+    for (const it of items) {
+      const k2 = ID2K.get(it.id);
+      if (k2 !== undefined && k2 !== selK) { FLAG[k2] = 1; flagged.push(k2); }
+    }
+    simActive = true; mat.uniforms.uDim.value = cfg.dim ? 1 : 0;
+    flagAttr.needsUpdate = true; $('#psim').classList.add('on');
+  } catch (e) {}
+}
+$('#psim').onclick = toggleSimilar;
+$('#pfly').onclick = () => { if (selK >= 0) flyToK(selK, 35); };
+$('#pclose').onclick = clearAll;
+const step = d => { if (selK < 0) return; const r = RANK[selK] + d; if (r >= 0 && r < N) selectK(ORDER[r], true); };
+$('#pprev').onclick = () => step(-1); $('#pnext').onclick = () => step(1);
+
+// ---------------- наведение и клик (ближайшее к курсору фото) ----------------
+const VP = new THREE.Matrix4();
+function pick(mx, my) {
+  if (!mat) return -1;
+  camera.updateMatrixWorld();
+  VP.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  const e = VP.elements, W = innerWidth, H = innerHeight, focal = focalPx();
+  let best = -1, bestW = Infinity;
+  for (let k = 0; k < KVIS; k++) {
+    const x0 = POS[k*3], y0 = POS[k*3+1], z0 = POS[k*3+2];
+    if (x0 < selLo[0] || x0 > selHi[0] || y0 < selLo[1] || y0 > selHi[1] || z0 < selLo[2] || z0 > selHi[2]) continue;
+    const x = mapV(x0, 0) * SC.x, y = mapV(y0, 1) * SC.y, z = mapV(z0, 2) * SC.z;
+    const w = e[3]*x + e[7]*y + e[11]*z + e[15];
+    if (w <= 0) continue;
+    const sx = ((e[0]*x + e[4]*y + e[8]*z + e[12]) / w * 0.5 + 0.5) * W;
+    const sy = (-(e[1]*x + e[5]*y + e[9]*z + e[13]) / w * 0.5 + 0.5) * H;
+    const half = Math.max(4, PX ? SIZE * 2 : 0.5 * SIZE * focal / w);
+    if (Math.abs(sx - mx) <= half && Math.abs(sy - my) <= half && w < bestW) { best = k; bestW = w; }
+  }
+  return best;
+}
+
+const tip = $('#tip'), tipc = $('#tipc').getContext('2d');
+tipc.imageSmoothingQuality = 'high';
+let hoverK = -1, mx = 0, my = 0, queued = false;
+function hideTip() { tip.style.display = 'none'; hoverK = -1; }
+function doHover() {
+  queued = false;
+  const k = pick(mx, my);
+  canvas.style.cursor = k >= 0 ? 'pointer' : 'grab';
+  if (k < 0) return hideTip();
+  if (k !== hoverK) {
+    hoverK = k;
+    const o = ORIG[k];
+    tipc.clearRect(0, 0, 112, 112);
+    tipc.drawImage(atlasImg, (o % atlasGrid) * atlasCell, Math.floor(o / atlasGrid) * atlasCell, atlasCell, atlasCell, 0, 0, 112, 112);
+    $('#tipd').textContent = new Date(DATE[k] * 1000).toLocaleDateString('ru', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  tip.style.display = 'block';
+  tip.style.left = Math.min(mx + 16, innerWidth - 140) + 'px';
+  tip.style.top = Math.min(my + 16, innerHeight - 170) + 'px';
+}
+canvas.addEventListener('pointermove', e => {
+  mx = e.clientX; my = e.clientY;
+  if (e.pointerType === 'touch' || e.buttons) return hideTip();
+  if (!queued) { queued = true; requestAnimationFrame(doHover); }
+});
+canvas.addEventListener('pointerleave', hideTip);
+
+let down = null;
+canvas.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; hideTip(); });
+canvas.addEventListener('pointerup', e => {
+  if (!down || !mat) return;
+  const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]); down = null;
+  if (moved > 5) return;                                   // это было вращение, а не клик
+  const k = pick(e.clientX, e.clientY);
+  if (k >= 0) selectK(k);
+});
+canvas.addEventListener('dblclick', e => {
+  const k = pick(e.clientX, e.clientY);
+  if (k >= 0) { selectK(k); flyToK(k, 35); }
+});
+
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'escape') clearAll();
+  else if (k === 'f') view('iso');
+  else if (k === '1') view('front');
+  else if (k === '2') view('top');
+  else if (k === '3') view('side');
+  else if (k === 'r') resetAll();
+  else if (k === 'h') { cfg.panel = !cfg.panel; applyAll(); save(); }
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  if (mat) mat.uniforms.uFocal.value = focalPx();
+});
+
+// ---------------- старт и цикл ----------------
+applyAll();
+if (N) {
+  for (let a = 0; a < 3; a++) syncRange(a, 0);
+  buildYears();
+  const iso = t => new Date(t * 1000).toISOString().slice(0, 10);
+  $('#d0').min = $('#d1').min = iso(RANGE[0]); $('#d0').max = $('#d1').max = iso(RANGE[1]);
+  view('iso', false);
+}
+(function animate() {
+  requestAnimationFrame(animate);
+  if (tween) {
+    const k = Math.min(1, (performance.now() - tween.s) / tween.ms), e = k < 0.5 ? 2*k*k : 1 - Math.pow(-2*k + 2, 2) / 2;
+    camera.position.lerpVectors(tween.p0, tween.p1, e);
+    controls.target.lerpVectors(tween.t0, tween.t1, e);
+    if (k >= 1) tween = null;
+  }
+  controls.update();
+  camera.updateMatrixWorld();
+  if (mat) {
+    mat.uniforms.uCamRight.value.setFromMatrixColumn(camera.matrixWorld, 0);
+    mat.uniforms.uCamUp.value.setFromMatrixColumn(camera.matrixWorld, 1);
+    mat.uniforms.uCamPos.value.copy(camera.position);
+  }
+  updateAxes();
+  renderer.render(scene, camera);
+})();
+</script>
+</body></html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Semamap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="/static/style.css">
+</head><body>
+<div id="osd"></div>
+<div id="bar">
+  <input id="q" placeholder="ПОИСК..." autocomplete="off">
+  <a id="to3d" class="btn" href="/3d" style="display:none">3D</a>
+  <button id="clr">СБРОС</button>
+  <button id="lblbtn" style="display:none">ЗОНЫ</button>
+  <span id="st"></span>
+</div>
+
+<div id="lb">
+  <div id="img-wrap"><img id="img" alt=""></div>
+
+  <div id="tags-box">
+    <div class="nsfw-row" id="nsfw-tags"></div>
+    <div class="tag-row" id="sfw-tags"></div>
+  </div>
+
+  <div id="lbrow">
+    <span id="cap"></span>
+    <button id="here">На карте</button>
+    <button id="cls">Закрыть</button>
+    <button id="sim">Похожие</button>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js"></script>
+<script src="/static/app.js"></script>
+</body></html>

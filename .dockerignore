@@ -1,0 +1,7 @@
+.git
+.env
+data
+hf_cache
+semamap_data
+**/__pycache__
+*.pyc
