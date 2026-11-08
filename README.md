@@ -4,13 +4,10 @@
 
 *English: Semamap builds a zoomable semantic map (CLIP embeddings + UMAP) of a local photo collection, with text search, similar-photo lookup and a 3D view (X = time, Y/Z = similarity). Everything runs on your machine.*
 
-<!-- Когда сделаете скриншоты (на демо-коллекции, не на личных фото), положите их в docs/ и раскомментируйте:
-
 ## Скриншоты
 
-![Карта](docs/map.png)
+![Карта](docs/2d.png)
 ![3D-вид](docs/3d.png)
--->
 
 ## Возможности
 
@@ -96,4 +93,4 @@ docs/              скриншоты для README
 
 ## Лицензия
 
-MIT, см. [LICENSE](LICENSE). Перед публикацией впишите своё имя в файл `LICENSE`.
+MIT, см. [LICENSE](LICENSE).
